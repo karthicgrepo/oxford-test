@@ -1,0 +1,3583 @@
+{
+  "x-generator": "NSwag v14.0.8.0 (NJsonSchema v11.0.1.0 (Newtonsoft.Json v13.0.0.0))",
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Global Model Workstation Online (GMWO) API",
+    "description": "Try out the API using our [Interactive API Explorer](../v1/swagger).\n\nFor code examples, see our [GitHub repository](https://github.com/OxfordEconomics/gmwo-api-examples).\n\n## Authentication\n\n### Generating an access token\n\n1. Visit the [API explorer page](../v1/swagger)\n2. Select the *Access Token* section\n3. Select the generate endpoint `/v1/access-token/generate`\n    - ![API Explorer Access Token Section](./static/images/api-explorer-access-token-section.jpg)\n4. Click *Try it out* on the right\n5. Edit the value of the request JSON body:\n    - Choose a value for the *Name* property\n    - ![API Explorer Access Token Generate Try It Out](./static/images/api-explorer-access-token-generate-try-it-out.jpg)\n6. Click *Execute*\n7. Copy the newly-generated token from the *Value* of the JSON response body. \n> PLEASE NOTE: The token value cannot be retrieved again. The token itself contains no information and is merely a reference to metadata that is stored in a database on the API. If the original value is lost, the token should be revoked and replaced.\n\n### Authenticating with an Access Token\n\nFor each HTTP request which requires authentication, the `Authorization` header must be set to: `Bearer {Value}`, where Value is a valid Access Token. If valid authentication is not provided, the HTTP response code is `401` and the response body *may* indicate one of the following reasons for failure:\n- no authentication provided\n- Access token has been revoked\n- Access token is otherwise invalid\n\n## Throttling (Request limits)\n\nWe place limits on each user's API usage to preserve system performance for our users generally, and to protect ourselves against undue cloud computing costs. There are two classes of request, detailed below, each of which has a different limit. \n\nFor each class of request, there is a maximum number of requests that each user can make successfully in a given timespan. Once the limit is reached, subsequent requests fail with the response code `429`. The response body is of the form: `API calls quota exceeded! maximum admitted [number of requests] per [unit of time].`\n\nRequest class|Description|Endpoints|Limit\n---|---|---|---\nInline requests|Requests for which the end result is generated immediately and included in the response body.|(All except those below)|50 per second\nEnqueued requests|Intensive operations such as model solutions are not completed within the lifetime of the request. Instead, they are added to a queue to be executed separately. The response to such requests is a `ForecastOperation` object. One or more separate *inline* requests must be sent to await the completion of the operation. The limit applies to the rate at which operations are *queued*, regardless of the eventual duration of those operations.|`v1/operations/apply` `v1/operations/solve` `v1/operations/export`|10 per minute\n\nFor practical examples of working with enqueued operations, please see the following in our [examples](https://github.com/OxfordEconomics/gmwo-api-examples/) GitHub repository:\n- [solve](https://github.com/OxfordEconomics/gmwo-api-examples/blob/main/solve/solve.ipynb)\n- [export](https://github.com/OxfordEconomics/gmwo-api-examples/blob/main/export/export.ipynb)\n\n\n> PLEASE NOTE: These limits, and the basis on which we apply limits, are liable to change in future\n",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://model.oxfordeconomics.com/api"
+    }
+  ],
+  "paths": {
+    "/v1/access-token": {
+      "get": {
+        "tags": [
+          "AccessToken"
+        ],
+        "summary": "Lists all active access tokens belonging to the current user.",
+        "operationId": "AccessToken_ListAll",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AccessToken"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/access-token/generate": {
+      "post": {
+        "tags": [
+          "AccessToken"
+        ],
+        "summary": "Generates a new access token to be used to authenticate to the API indefinitely.",
+        "operationId": "AccessToken_Generate",
+        "requestBody": {
+          "x-name": "accessTokenRequest",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccessTokenRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewAccessToken"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/access-token/{id}": {
+      "delete": {
+        "tags": [
+          "AccessToken"
+        ],
+        "summary": "Permanently deactivates the specified access token.",
+        "operationId": "AccessToken_Revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/versions/latest": {
+      "get": {
+        "tags": [
+          "ApiVersion"
+        ],
+        "summary": "Gets the current API version.",
+        "operationId": "ApiVersion_GetCurrent",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiVersion"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/files/upload/{path}": {
+      "post": {
+        "tags": [
+          "FileUpload"
+        ],
+        "summary": "Uploads a file. If the target file does not exist, it is created.\nIf the target file does exist, the uploaded file becomes its current version.\nThe form value \"FileExtension\" must be specified.",
+        "description": "There are restrictions on the type and size of file which can be uploaded. If you receive a Bad Request (400) response, please see the response body for details.",
+        "operationId": "FileUpload_Post",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "description": "The location at which the file will be saved.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Details of the newly-created or updated file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericFile"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecast-contents/{id}/groups": {
+      "get": {
+        "tags": [
+          "ForecastContents"
+        ],
+        "summary": "Gets the groups for the latest version of a forecast.",
+        "operationId": "ForecastContents_GetAllGroupsFromLatest",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the forecast.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Group"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecast-contents/{id}/{version}/groups": {
+      "get": {
+        "tags": [
+          "ForecastContents"
+        ],
+        "summary": "Gets the groups for a particular version of a forecast.",
+        "operationId": "ForecastContents_GetAllGroups",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the forecast.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "description": "The zero-based version of the forecast.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Group"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecast-contents/{id}/indicators": {
+      "get": {
+        "tags": [
+          "ForecastContents"
+        ],
+        "summary": "Gets the indicators for the latest version of a forecast.",
+        "operationId": "ForecastContents_GetAllIndicatorsFromLatest",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the forecast.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Indicator"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecast-contents/{id}/{version}/indicators": {
+      "get": {
+        "tags": [
+          "ForecastContents"
+        ],
+        "summary": "Gets the indicators for a particular version of a forecast.",
+        "operationId": "ForecastContents_GetAllIndicators",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the forecast.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "description": "The zero-based version of the forecast.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Indicator"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecast-contents/{id}/variable/{sectorCode}/{indicatorCode}": {
+      "get": {
+        "tags": [
+          "ForecastContents"
+        ],
+        "summary": "Gets a single variable from the latest version of a forecast.",
+        "operationId": "ForecastContents_GetVariableFromLatest",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the forecast.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "sectorCode",
+            "in": "path",
+            "required": true,
+            "description": "The sector code of the variable.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 2
+          },
+          {
+            "name": "indicatorCode",
+            "in": "path",
+            "required": true,
+            "description": "The indicator code of the variable.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 3
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Variable"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecast-contents/{id}/variable/{sectorCode}": {
+      "get": {
+        "tags": [
+          "ForecastContents"
+        ],
+        "summary": "Gets a single variable from the latest version of a forecast.",
+        "operationId": "ForecastContents_GetVariableFromLatest2",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the forecast.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "sectorCode",
+            "in": "path",
+            "required": true,
+            "description": "The sector code of the variable.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Variable"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecast-contents/{id}/{version}/variable/{sectorCode}/{indicatorCode}": {
+      "get": {
+        "tags": [
+          "ForecastContents"
+        ],
+        "summary": "Gets a single variable from a particular version of a forecast.",
+        "operationId": "ForecastContents_GetVariable",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the forecast.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "description": "The zero-based version of the forecast.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "x-position": 2
+          },
+          {
+            "name": "sectorCode",
+            "in": "path",
+            "required": true,
+            "description": "The sector code of the variable.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 3
+          },
+          {
+            "name": "indicatorCode",
+            "in": "path",
+            "required": true,
+            "description": "The indicator code of the variable.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 4
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Variable"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecast-contents/{id}/{version}/variable/{sectorCode}": {
+      "get": {
+        "tags": [
+          "ForecastContents"
+        ],
+        "summary": "Gets a single variable from a particular version of a forecast.",
+        "operationId": "ForecastContents_GetVariable2",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the forecast.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "description": "The zero-based version of the forecast.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "x-position": 2
+          },
+          {
+            "name": "sectorCode",
+            "in": "path",
+            "required": true,
+            "description": "The sector code of the variable.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 3
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Variable"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecast-contents/{id}/variables": {
+      "post": {
+        "tags": [
+          "ForecastContents"
+        ],
+        "summary": "Gets a selection of variables from the latest version of a forecast.",
+        "operationId": "ForecastContents_GetVariablesFromLatest",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the forecast.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "onlyProps",
+            "in": "query",
+            "description": "An optional list of comma-separated variable properties which must be included in the response. If omitted, all properties must be included. If specified, the server *may* use it to optimize request processing.",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            },
+            "x-position": 3
+          }
+        ],
+        "requestBody": {
+          "x-name": "variables",
+          "description": "The variable selection.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/VariableKey"
+                }
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Variable"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecast-contents/{id}/{version}/variables": {
+      "post": {
+        "tags": [
+          "ForecastContents"
+        ],
+        "summary": "Gets a selection of variables from a particular version of a forecast.",
+        "operationId": "ForecastContents_GetVariables",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the forecast.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "description": "The zero-based version of the forecast.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "x-position": 2
+          },
+          {
+            "name": "onlyProps",
+            "in": "query",
+            "description": "An optional list of comma-separated variable properties which must be included in the response. If omitted, all properties must be included. If specified, the server *may* use it to optimize request processing.",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            },
+            "x-position": 4
+          }
+        ],
+        "requestBody": {
+          "x-name": "variables",
+          "description": "The variable selection.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/VariableKey"
+                }
+              }
+            }
+          },
+          "required": true,
+          "x-position": 3
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Variable"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecast-contents/{id}/model-variable/{sectorCode}/{indicatorCode}": {
+      "get": {
+        "tags": [
+          "ForecastContents"
+        ],
+        "summary": "Gets a single model variable from the latest version of a forecast.",
+        "operationId": "ForecastContents_GetModelVariableFromLatest",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the forecast.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "sectorCode",
+            "in": "path",
+            "required": true,
+            "description": "The sector code of the variable.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 2
+          },
+          {
+            "name": "indicatorCode",
+            "in": "path",
+            "required": true,
+            "description": "The indicator code of the variable.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 3
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVariable"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecast-contents/{id}/model-variable/{sectorCode}": {
+      "get": {
+        "tags": [
+          "ForecastContents"
+        ],
+        "summary": "Gets a single model variable from the latest version of a forecast.",
+        "operationId": "ForecastContents_GetModelVariableFromLatest2",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the forecast.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "sectorCode",
+            "in": "path",
+            "required": true,
+            "description": "The sector code of the variable.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVariable"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecast-contents/{id}/{version}/model-variable/{sectorCode}/{indicatorCode}": {
+      "get": {
+        "tags": [
+          "ForecastContents"
+        ],
+        "summary": "Gets a single model variable from a particular version of a forecast.",
+        "operationId": "ForecastContents_GetModelVariable",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the forecast.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "description": "The zero-based version of the forecast.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "x-position": 2
+          },
+          {
+            "name": "sectorCode",
+            "in": "path",
+            "required": true,
+            "description": "The sector code of the variable.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 3
+          },
+          {
+            "name": "indicatorCode",
+            "in": "path",
+            "required": true,
+            "description": "The indicator code of the variable.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 4
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVariable"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecast-contents/{id}/{version}/model-variable/{sectorCode}": {
+      "get": {
+        "tags": [
+          "ForecastContents"
+        ],
+        "summary": "Gets a single model variable from a particular version of a forecast.",
+        "operationId": "ForecastContents_GetModelVariable2",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the forecast.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "description": "The zero-based version of the forecast.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "x-position": 2
+          },
+          {
+            "name": "sectorCode",
+            "in": "path",
+            "required": true,
+            "description": "The sector code of the variable.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 3
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVariable"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecast-contents/{id}/model-variables": {
+      "post": {
+        "tags": [
+          "ForecastContents"
+        ],
+        "summary": "Gets a selection of model variables from the latest version of a forecast.",
+        "operationId": "ForecastContents_GetModelVariablesFromLatest",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the forecast.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "onlyProps",
+            "in": "query",
+            "description": "An optional list of comma-separated variable properties which must be included in the response. If omitted, all properties must be included. If specified, the server *may* use it to optimize request processing.",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            },
+            "x-position": 3
+          }
+        ],
+        "requestBody": {
+          "x-name": "variables",
+          "description": "The variable selection.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/VariableKey"
+                }
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModelVariable"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecast-contents/{id}/{version}/model-variables": {
+      "post": {
+        "tags": [
+          "ForecastContents"
+        ],
+        "summary": "Gets a selection of model variables from a particular version of a forecast.",
+        "operationId": "ForecastContents_GetModelVariables",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the forecast.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "description": "The zero-based version of the forecast.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "x-position": 2
+          },
+          {
+            "name": "onlyProps",
+            "in": "query",
+            "description": "An optional list of comma-separated variable properties which must be included in the response. If omitted, all properties must be included. If specified, the server *may* use it to optimize request processing.",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            },
+            "x-position": 4
+          }
+        ],
+        "requestBody": {
+          "x-name": "variables",
+          "description": "The variable selection.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/VariableKey"
+                }
+              }
+            }
+          },
+          "required": true,
+          "x-position": 3
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModelVariable"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecast-contents/{id}/control/{code}": {
+      "get": {
+        "tags": [
+          "ForecastContents"
+        ],
+        "summary": "Get a control from the latest version of a forecast",
+        "operationId": "ForecastContents_GetControl",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the forecast",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Control"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecast-contents/{id}/{version}/control/{code}": {
+      "get": {
+        "tags": [
+          "ForecastContents"
+        ],
+        "summary": "Get a control from a specific version of a forecast",
+        "operationId": "ForecastContents_GetControlFromForecastVersion",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "x-position": 2
+          },
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 3
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Control"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecasts/{id}": {
+      "get": {
+        "tags": [
+          "Forecast"
+        ],
+        "summary": "Gets a forecast.",
+        "operationId": "Forecast_Get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the forecast.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Forecast"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/forecasts/{id}/{version}": {
+      "get": {
+        "tags": [
+          "Forecast"
+        ],
+        "summary": "Gets a forecast version.",
+        "operationId": "Forecast_GetVersion",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the forecast.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "description": "The zero-based version of the forecast.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForecastVersion"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/operations/export": {
+      "post": {
+        "tags": [
+          "ForecastOperation"
+        ],
+        "summary": "Enqueues an operation which exports a selection of data from a forecast to a file.",
+        "description": "This request enqueues an operation which runs in the background. Use the /operations/{id}/await endpoint to wait for the operation to finish.",
+        "operationId": "ForecastOperation_Export",
+        "requestBody": {
+          "x-name": "exportRequest",
+          "description": "The parameters for the export.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportForecast"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "The enqueued operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForecastOperation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/operations/{id}": {
+      "get": {
+        "tags": [
+          "ForecastOperation"
+        ],
+        "summary": "Gets an existing forecast operation.",
+        "operationId": "ForecastOperation_Get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the operation.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForecastOperation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/operations/{operationId}/artifact/{artifactId}": {
+      "get": {
+        "tags": [
+          "ForecastOperation"
+        ],
+        "summary": "Downloads an artifact associated with a forecast operation.",
+        "operationId": "ForecastOperation_DownloadArtifact",
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "description": "The id of the operation.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "artifactId",
+            "in": "path",
+            "required": true,
+            "description": "The id of the artifact.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/operations/apply": {
+      "post": {
+        "tags": [
+          "ForecastOperation"
+        ],
+        "summary": "Enqueues an operation which applies the specified commands or data imports to the input forecast without solving, creating a new forecast.",
+        "description": "This request enqueues an operation which runs in the background. Use the /operations/{id}/await endpoint to wait for the operation to finish. You should always provide either a set of Commands or a Commands File, but not both.",
+        "operationId": "ForecastOperation_Apply",
+        "requestBody": {
+          "x-name": "applyRequest",
+          "description": "The operation parameters.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyForecast"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "The enqueued operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForecastOperation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/operations/solve": {
+      "post": {
+        "tags": [
+          "ForecastOperation"
+        ],
+        "summary": "Enqueues an operation which applies the specified commands or data imports to the input forecast before performing a model solution, creating a new forecast.",
+        "description": "This request enqueues an operation which runs in the background. Use the /operations/{id}/await endpoint to wait for the operation to finish. It is not necessary to submit any Commands or a Commands File in order to perform a solve but, if you do, you should submit either one or the other and not both.",
+        "operationId": "ForecastOperation_Solve",
+        "requestBody": {
+          "x-name": "solveRequest",
+          "description": "The operation parameters.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolveForecast"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "The enqueued operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForecastOperation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/operations/{id}/await": {
+      "get": {
+        "tags": [
+          "ForecastOperationLongRequests"
+        ],
+        "summary": "Waits for an existing forecast operation to complete.",
+        "description": "To avoid issues with connections being closed prematurely, this request times out after a minute or so. Therefore calling code should keep polling until a final status is reached.",
+        "operationId": "ForecastOperation_Await",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the operation.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForecastOperation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/operations/{id}/cancel": {
+      "post": {
+        "tags": [
+          "ForecastOperationLongRequests"
+        ],
+        "summary": "Cancels an existing forecast operation.",
+        "operationId": "ForecastOperation_Cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The id of the operation.",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForecastOperation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/resources/{identifier}": {
+      "get": {
+        "tags": [
+          "Resource"
+        ],
+        "summary": "Gets a resource.",
+        "operationId": "Resource_Get",
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "description": "The path or id of the resource. Ids should be prefixed with =. Paths should begin with one of: a) a user code, b) an organization code, c) \"me\" or d) \"us\".",
+            "schema": {
+              "type": "string",
+              "default": ""
+            },
+            "x-position": 1
+          },
+          {
+            "name": "includeAllFileTypes",
+            "in": "query",
+            "description": "Where the resource is a directory, indicates whether or not to include non-forecast files contained therein. The default is to include only forecast files.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Resource"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/status/version": {
+      "get": {
+        "tags": [
+          "SystemStatus"
+        ],
+        "summary": "Gets the assembly version",
+        "operationId": "SystemStatus_Version",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/users/me": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Gets details of the authenticated user.",
+        "operationId": "User_GetMe",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonUser"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccessToken": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Id",
+          "Name",
+          "CreatedAt"
+        ],
+        "properties": {
+          "Id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "Name": {
+            "type": "string"
+          },
+          "CreatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NewAccessToken": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AccessToken"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "Value"
+            ],
+            "properties": {
+              "Value": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "AccessTokenRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "Name": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ApiVersion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "GitCommit",
+          "Version",
+          "CodeVersion"
+        ],
+        "properties": {
+          "BuildTime": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "GitCommit": {
+            "type": "string"
+          },
+          "Version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "CodeVersion": {
+            "type": "string"
+          }
+        }
+      },
+      "Feature": {
+        "type": "string",
+        "description": "A feature which may or may not be supported by a particular version of the API.",
+        "x-enumNames": [
+          "EvaluateCanonicalExpressions",
+          "UploadZippedForecasts"
+        ],
+        "enum": [
+          "EvaluateCanonicalExpressions",
+          "UploadZippedForecasts"
+        ]
+      },
+      "Domain": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Code",
+          "Name",
+          "Products"
+        ],
+        "properties": {
+          "Code": {
+            "type": "string"
+          },
+          "Name": {
+            "type": "string"
+          },
+          "Products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Product"
+            }
+          },
+          "IconUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Product": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "TypeCode",
+          "Code"
+        ],
+        "properties": {
+          "TypeCode": {
+            "type": "string",
+            "minLength": 1
+          },
+          "Code": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "PutDomain": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Name",
+          "Products"
+        ],
+        "properties": {
+          "Name": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1
+          },
+          "Products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Product"
+            }
+          }
+        }
+      },
+      "File": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Resource"
+          },
+          {
+            "type": "object",
+            "discriminator": {
+              "propertyName": "Type"
+            },
+            "x-abstract": true,
+            "additionalProperties": false,
+            "required": [
+              "Type"
+            ],
+            "properties": {
+              "Type": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "Resource": {
+        "type": "object",
+        "discriminator": {
+          "propertyName": "Type",
+          "mapping": {
+            "Directory": "#/components/schemas/Directory"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "Type",
+          "ResourceType",
+          "Id",
+          "Name",
+          "Path"
+        ],
+        "properties": {
+          "ResourceType": {
+            "$ref": "#/components/schemas/ResourceType"
+          },
+          "Id": {
+            "type": "string"
+          },
+          "Name": {
+            "type": "string"
+          },
+          "Path": {
+            "type": "string"
+          },
+          "Archiving": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Archiving"
+              }
+            ]
+          },
+          "Product": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Product"
+              }
+            ]
+          },
+          "Type": {
+            "type": "string"
+          }
+        }
+      },
+      "ResourceType": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Forecast",
+          "Directory",
+          "OtherFile"
+        ],
+        "enum": [
+          "Forecast",
+          "Directory",
+          "OtherFile"
+        ]
+      },
+      "Archiving": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ArchivedAt",
+          "ArchivedFrom"
+        ],
+        "properties": {
+          "ArchivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ArchivedFrom": {
+            "type": "string"
+          }
+        }
+      },
+      "Forecast": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/File"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "EconomicDomain",
+              "ForecastUrl",
+              "Versions"
+            ],
+            "properties": {
+              "EconomicDomain": {
+                "type": "string"
+              },
+              "ForecastUrl": {
+                "type": "string"
+              },
+              "Versions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ForecastVersion"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ForecastVersion": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FileVersion"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "Name",
+              "EconomicDomain",
+              "Range"
+            ],
+            "properties": {
+              "Name": {
+                "type": "string"
+              },
+              "EconomicDomain": {
+                "type": "string"
+              },
+              "Range": {
+                "$ref": "#/components/schemas/PeriodRange"
+              }
+            }
+          }
+        ]
+      },
+      "PeriodRange": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "From",
+          "To"
+        ],
+        "properties": {
+          "From": {
+            "type": "string",
+            "minLength": 1
+          },
+          "To": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "FileVersion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Id",
+          "Version",
+          "CreatedAt"
+        ],
+        "properties": {
+          "Id": {
+            "type": "string"
+          },
+          "Version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "CreatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Directory": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Resource"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "Children"
+            ],
+            "properties": {
+              "Children": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Resource"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "GenericFile": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/File"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "MimeType",
+              "FileType",
+              "Versions"
+            ],
+            "properties": {
+              "MimeType": {
+                "type": "string"
+              },
+              "FileType": {
+                "type": "string"
+              },
+              "Versions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FileVersion"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Group": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Code",
+          "Name",
+          "Type"
+        ],
+        "properties": {
+          "Code": {
+            "type": "string"
+          },
+          "Name": {
+            "type": "string"
+          },
+          "Type": {
+            "$ref": "#/components/schemas/GroupType"
+          }
+        }
+      },
+      "GroupType": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Normal",
+          "Hidden"
+        ],
+        "enum": [
+          "Normal",
+          "Hidden"
+        ]
+      },
+      "Indicator": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Code",
+          "Name"
+        ],
+        "properties": {
+          "Code": {
+            "type": "string"
+          },
+          "Name": {
+            "type": "string"
+          }
+        }
+      },
+      "Node": {
+        "type": "object",
+        "discriminator": {
+          "propertyName": "Type",
+          "mapping": {
+            "Leaf": "#/components/schemas/Leaf",
+            "Branch": "#/components/schemas/Branch"
+          }
+        },
+        "x-abstract": true,
+        "additionalProperties": false,
+        "required": [
+          "Type",
+          "Name"
+        ],
+        "properties": {
+          "Name": {
+            "type": "string"
+          },
+          "Type": {
+            "type": "string"
+          }
+        }
+      },
+      "Leaf": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Node"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "Code"
+            ],
+            "properties": {
+              "Code": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "Branch": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Node"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "Children"
+            ],
+            "properties": {
+              "Children": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Node"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Variable": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "IndicatorCode",
+          "GroupCode",
+          "SectorCode",
+          "Values",
+          "Frequency"
+        ],
+        "properties": {
+          "IndicatorCode": {
+            "type": "string"
+          },
+          "GroupCode": {
+            "type": "string"
+          },
+          "SectorCode": {
+            "type": "string",
+            "deprecated": true,
+            "x-deprecatedMessage": "Use GroupCode instead"
+          },
+          "Values": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PeriodValue"
+            }
+          },
+          "Frequency": {
+            "$ref": "#/components/schemas/Frequency"
+          },
+          "Metadata": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/VariableMetadata"
+              }
+            ]
+          }
+        }
+      },
+      "PeriodValue": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Value",
+          "Period"
+        ],
+        "properties": {
+          "Value": {
+            "type": "number",
+            "format": "float"
+          },
+          "Period": {
+            "type": "string"
+          }
+        }
+      },
+      "Frequency": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Annual",
+          "Quarterly",
+          "Monthly",
+          "Daily"
+        ],
+        "enum": [
+          "Annual",
+          "Quarterly",
+          "Monthly",
+          "Daily"
+        ]
+      },
+      "VariableMetadata": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "AnnualizationType",
+          "IsSeasonallyAdjusted",
+          "GroupName",
+          "IndicatorProperties",
+          "InternalId"
+        ],
+        "properties": {
+          "Description": {
+            "type": "string",
+            "nullable": true
+          },
+          "AnnualizationType": {
+            "$ref": "#/components/schemas/AnnualizationType"
+          },
+          "Units": {
+            "type": "string",
+            "nullable": true
+          },
+          "ScaleFactor": {
+            "type": "string",
+            "nullable": true
+          },
+          "Source": {
+            "type": "string",
+            "nullable": true
+          },
+          "Unit": {
+            "type": "string",
+            "nullable": true
+          },
+          "Scaling": {
+            "type": "string",
+            "nullable": true
+          },
+          "OriginalSourceProvider": {
+            "type": "string",
+            "nullable": true
+          },
+          "OriginalSourceCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "IsSeasonallyAdjusted": {
+            "type": "boolean"
+          },
+          "ContactName": {
+            "type": "string",
+            "nullable": true
+          },
+          "ContactEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "BaseYearIndex": {
+            "type": "string",
+            "nullable": true
+          },
+          "BaseYearPrice": {
+            "type": "string",
+            "nullable": true
+          },
+          "DerivedHistoryEnd": {
+            "type": "string",
+            "nullable": true
+          },
+          "GroupName": {
+            "type": "string"
+          },
+          "IndicatorProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "InternalId": {
+            "type": "string"
+          }
+        }
+      },
+      "AnnualizationType": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Sum",
+          "Average",
+          "LastQuarter",
+          "Unknown"
+        ],
+        "enum": [
+          "Sum",
+          "Average",
+          "LastQuarter",
+          "Unknown"
+        ]
+      },
+      "VariableKey": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "GroupCode",
+          "IndicatorCode"
+        ],
+        "properties": {
+          "GroupCode": {
+            "type": "string",
+            "minLength": 1
+          },
+          "IndicatorCode": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "ModelVariable": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Variable"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "Residuals",
+              "ResidualType",
+              "Equations",
+              "Fixes",
+              "FixHints"
+            ],
+            "properties": {
+              "Residuals": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PeriodValue"
+                }
+              },
+              "ResidualType": {
+                "$ref": "#/components/schemas/ResidualType"
+              },
+              "Equations": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Equation"
+                }
+              },
+              "Fixes": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Fix"
+                }
+              },
+              "FixHints": {
+                "$ref": "#/components/schemas/FixHints"
+              },
+              "SecondResidual": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/VariableKey"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "ResidualType": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Additive",
+          "Multiplicative",
+          "Exogenous",
+          "Identity"
+        ],
+        "enum": [
+          "Additive",
+          "Multiplicative",
+          "Exogenous",
+          "Identity"
+        ]
+      },
+      "Equation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Type",
+          "Range",
+          "Expression"
+        ],
+        "properties": {
+          "Type": {
+            "$ref": "#/components/schemas/EquationType"
+          },
+          "Range": {
+            "$ref": "#/components/schemas/PeriodRange"
+          },
+          "Expression": {
+            "type": "string"
+          }
+        }
+      },
+      "EquationType": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Behavioural",
+          "Transformation",
+          "Identity",
+          "ResidualTransformation"
+        ],
+        "enum": [
+          "Behavioural",
+          "Transformation",
+          "Identity",
+          "ResidualTransformation"
+        ]
+      },
+      "Fix": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Variable",
+          "Range",
+          "IsHistoric",
+          "Instruments"
+        ],
+        "properties": {
+          "Variable": {
+            "$ref": "#/components/schemas/VariableKey"
+          },
+          "Range": {
+            "$ref": "#/components/schemas/PeriodRange"
+          },
+          "IsHistoric": {
+            "type": "boolean"
+          },
+          "Instruments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FixInstrument"
+            }
+          }
+        }
+      },
+      "FixInstrument": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Instrument",
+          "Coefficient"
+        ],
+        "properties": {
+          "Instrument": {
+            "$ref": "#/components/schemas/VariableKey"
+          },
+          "Coefficient": {
+            "type": "number",
+            "format": "float"
+          }
+        }
+      },
+      "FixHints": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "History",
+          "Forecast"
+        ],
+        "properties": {
+          "History": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FixInstrument"
+            }
+          },
+          "Forecast": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FixInstrument"
+            }
+          }
+        }
+      },
+      "Control": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Code",
+          "Value"
+        ],
+        "properties": {
+          "Code": {
+            "type": "string"
+          },
+          "Value": {
+            "type": "number",
+            "format": "float"
+          }
+        }
+      },
+      "Coefficient": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Code",
+          "Value"
+        ],
+        "properties": {
+          "Code": {
+            "type": "string"
+          },
+          "GroupCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "Value": {
+            "type": "number",
+            "format": "float"
+          },
+          "Name": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "DomainAdapter": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "TargetDomain",
+          "Direction"
+        ],
+        "properties": {
+          "TargetDomain": {
+            "type": "string"
+          },
+          "Direction": {
+            "$ref": "#/components/schemas/DomainAdapterDirection"
+          }
+        }
+      },
+      "DomainAdapterDirection": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Incoming"
+        ],
+        "enum": [
+          "Incoming"
+        ]
+      },
+      "ForecastOperation": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ForecastOperationHistory"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "Artifacts",
+              "Resources"
+            ],
+            "properties": {
+              "Artifacts": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ForecastArtifact"
+                }
+              },
+              "Resources": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/OperationResource"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ForecastArtifact": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Id",
+          "Filename",
+          "Type",
+          "DownloadUrl"
+        ],
+        "properties": {
+          "Id": {
+            "type": "string"
+          },
+          "Filename": {
+            "type": "string"
+          },
+          "Type": {
+            "type": "string"
+          },
+          "DownloadUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "OperationResource": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Id",
+          "Version",
+          "Role"
+        ],
+        "properties": {
+          "Id": {
+            "type": "string"
+          },
+          "Path": {
+            "type": "string",
+            "nullable": true
+          },
+          "Version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "Role": {
+            "$ref": "#/components/schemas/OperationResourceRole"
+          }
+        }
+      },
+      "OperationResourceRole": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Input",
+          "Output"
+        ],
+        "enum": [
+          "Input",
+          "Output"
+        ]
+      },
+      "ForecastOperationHistory": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Id",
+          "CreatedAt",
+          "Status"
+        ],
+        "properties": {
+          "Id": {
+            "type": "string"
+          },
+          "CreatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "StartedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "CompletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "Status": {
+            "$ref": "#/components/schemas/OperationStatus"
+          },
+          "Duration": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "FailureReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "Name": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "OperationStatus": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Queued",
+          "InProgress",
+          "Failed",
+          "Succeeded",
+          "Cancelled"
+        ],
+        "enum": [
+          "Queued",
+          "InProgress",
+          "Failed",
+          "Succeeded",
+          "Cancelled"
+        ]
+      },
+      "CreateForecastParameters": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Path",
+          "Range",
+          "DomainCode"
+        ],
+        "properties": {
+          "Path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "Range": {
+            "$ref": "#/components/schemas/PeriodRange"
+          },
+          "DomainCode": {
+            "type": "string",
+            "minLength": 1
+          },
+          "InitialCommandsScript": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ForecastPatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "Product": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ExportForecast": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Range",
+          "InputForecast"
+        ],
+        "properties": {
+          "Range": {
+            "$ref": "#/components/schemas/PeriodRange"
+          },
+          "Format": {
+            "type": "string",
+            "nullable": true
+          },
+          "AnnualRollup": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "SeriesSelection": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/SeriesSelection"
+            }
+          },
+          "InputForecast": {
+            "type": "string",
+            "minLength": 1
+          },
+          "OperationName": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "SeriesSelection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Indicator",
+          "Location"
+        ],
+        "properties": {
+          "Indicator": {
+            "type": "string"
+          },
+          "Location": {
+            "type": "string"
+          },
+          "Transformation": {
+            "type": "string",
+            "nullable": true
+          },
+          "ValueType": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ValueType"
+              }
+            ]
+          }
+        }
+      },
+      "ValueType": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Variable",
+          "Residual"
+        ],
+        "enum": [
+          "Variable",
+          "Residual"
+        ]
+      },
+      "EnqueueForecastOperationParameters": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Script"
+        ],
+        "properties": {
+          "Script": {
+            "type": "string",
+            "minLength": 1
+          },
+          "Name": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "SaveArtifactRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Path"
+        ],
+        "properties": {
+          "Path": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "PageOfForecastOperationHistory": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Items",
+          "Links"
+        ],
+        "properties": {
+          "Items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ForecastOperationHistory"
+            }
+          },
+          "Links": {
+            "$ref": "#/components/schemas/PageLinks"
+          }
+        }
+      },
+      "PageLinks": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "First": {
+            "type": "string",
+            "nullable": true
+          },
+          "Next": {
+            "type": "string",
+            "nullable": true
+          },
+          "Previous": {
+            "type": "string",
+            "nullable": true
+          },
+          "Last": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ApplyForecast": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApplyForecastBase"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "ApplyForecastBase": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "InputForecast",
+          "OutputForecast"
+        ],
+        "properties": {
+          "InputForecast": {
+            "type": "string",
+            "minLength": 1
+          },
+          "OutputForecast": {
+            "type": "string",
+            "minLength": 1
+          },
+          "OperationName": {
+            "type": "string",
+            "nullable": true
+          },
+          "Commands": {
+            "type": "string",
+            "nullable": true
+          },
+          "CommandsFile": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "SolveForecast": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApplyForecastBase"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "SolutionRange"
+            ],
+            "properties": {
+              "SolutionRange": {
+                "$ref": "#/components/schemas/PeriodRange"
+              },
+              "Groups": {
+                "type": "array",
+                "nullable": true,
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ExceptionDetails": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Type",
+          "Message",
+          "StackTrace"
+        ],
+        "properties": {
+          "Type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "Message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "StackTrace": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "HealthCheckResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Name",
+          "Status"
+        ],
+        "properties": {
+          "Name": {
+            "type": "string"
+          },
+          "Status": {
+            "$ref": "#/components/schemas/HealthCheckStatus"
+          },
+          "Message": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "HealthCheckStatus": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Ok",
+          "Warning",
+          "Error"
+        ],
+        "enum": [
+          "Ok",
+          "Warning",
+          "Error"
+        ]
+      },
+      "EvaluatedVariable": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Variable",
+          "Values"
+        ],
+        "properties": {
+          "Variable": {
+            "$ref": "#/components/schemas/VariableKey"
+          },
+          "Values": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PeriodValue"
+            }
+          },
+          "ErrorMessage": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ApplyExpressionParameters": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Expression",
+          "Range",
+          "Variables"
+        ],
+        "properties": {
+          "Expression": {
+            "type": "string",
+            "minLength": 1
+          },
+          "Variables": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvaluationVariable"
+            }
+          },
+          "Range": {
+            "$ref": "#/components/schemas/PeriodRange"
+          }
+        }
+      },
+      "EvaluationVariable": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Variable",
+          "Values"
+        ],
+        "properties": {
+          "Variable": {
+            "$ref": "#/components/schemas/VariableKey"
+          },
+          "Values": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PeriodValue"
+            }
+          },
+          "Frequency": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Frequency"
+              }
+            ]
+          }
+        }
+      },
+      "VariableDependency": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "VariableKey",
+          "EquationType",
+          "Range"
+        ],
+        "properties": {
+          "VariableKey": {
+            "$ref": "#/components/schemas/VariableKey"
+          },
+          "EquationType": {
+            "$ref": "#/components/schemas/EquationType"
+          },
+          "Range": {
+            "$ref": "#/components/schemas/PeriodRange"
+          }
+        }
+      },
+      "MappedVariableKey": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "SectorCode"
+        ],
+        "properties": {
+          "SectorCode": {
+            "type": "string",
+            "minLength": 1
+          },
+          "IndicatorCode": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ParseVariableDataRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "InputFile"
+        ],
+        "properties": {
+          "InputFile": {
+            "type": "string",
+            "minLength": 1
+          },
+          "VariableFilter": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ExcelVariableDataFilter"
+              }
+            ]
+          }
+        }
+      },
+      "ExcelVariableDataFilter": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "GroupCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "IndicatorCode": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Permission": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Level",
+          "Source"
+        ],
+        "properties": {
+          "Level": {
+            "$ref": "#/components/schemas/PermissionLevel"
+          },
+          "Source": {
+            "$ref": "#/components/schemas/PermissionSource"
+          }
+        }
+      },
+      "PermissionLevel": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Read",
+          "Modify"
+        ],
+        "enum": [
+          "Read",
+          "Modify"
+        ]
+      },
+      "PermissionSource": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "UserIsOwner",
+          "UserIsOrganizationMember",
+          "UserIsOrganizationAdmin",
+          "ResourceSharedByHost",
+          "UserIsSystemAdmin",
+          "ResourceIsGlobal",
+          "UserHasRole"
+        ],
+        "enum": [
+          "UserIsOwner",
+          "UserIsOrganizationMember",
+          "UserIsOrganizationAdmin",
+          "ResourceSharedByHost",
+          "UserIsSystemAdmin",
+          "ResourceIsGlobal",
+          "UserHasRole"
+        ]
+      },
+      "PlaceListing": {
+        "type": "object",
+        "discriminator": {
+          "propertyName": "Type",
+          "mapping": {
+            "DirectoryPlaceListing": "#/components/schemas/DirectoryPlaceListing"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "Type",
+          "Code",
+          "Name",
+          "Url"
+        ],
+        "properties": {
+          "Code": {
+            "type": "string"
+          },
+          "Name": {
+            "type": "string"
+          },
+          "Url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "Type": {
+            "type": "string"
+          }
+        }
+      },
+      "DirectoryPlaceListing": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PlaceListing"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "Path"
+            ],
+            "properties": {
+              "Path": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "Place": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PlaceListing"
+          },
+          {
+            "type": "object",
+            "discriminator": {
+              "propertyName": "Type",
+              "mapping": {
+                "DirectoryPlace": "#/components/schemas/DirectoryPlace"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "Type",
+              "Resources"
+            ],
+            "properties": {
+              "Resources": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Resource"
+                }
+              },
+              "Type": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "DirectoryPlace": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Place"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "Path"
+            ],
+            "properties": {
+              "Path": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "DirectoryPut": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "Product": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ResourcePatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "Directory": {
+            "type": "string",
+            "nullable": true
+          },
+          "Name": {
+            "type": "string",
+            "nullable": true
+          },
+          "ArchiveAction": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ArchiveAction"
+              }
+            ]
+          },
+          "Product": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ArchiveAction": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Archive",
+          "Restore"
+        ],
+        "enum": [
+          "Archive",
+          "Restore"
+        ]
+      },
+      "ResourceCopy": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Directory"
+        ],
+        "properties": {
+          "Directory": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "Scenario": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Id",
+          "Name",
+          "Version",
+          "Description",
+          "MaxSolutionRange",
+          "DefaultSolutionRange",
+          "ExecutableLink",
+          "DetailsImageLinks",
+          "Priority",
+          "ExecutableType",
+          "LastUpdated"
+        ],
+        "properties": {
+          "Id": {
+            "type": "string"
+          },
+          "Name": {
+            "type": "string"
+          },
+          "Version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "Description": {
+            "type": "string"
+          },
+          "MaxSolutionRange": {
+            "$ref": "#/components/schemas/RelativeRange"
+          },
+          "DefaultSolutionRange": {
+            "$ref": "#/components/schemas/RelativeRange"
+          },
+          "ExecutableLink": {
+            "type": "string",
+            "format": "uri"
+          },
+          "DetailsImageLinks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "DetailsLink": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "Priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ExecutableType": {
+            "$ref": "#/components/schemas/ScenarioExectuableType"
+          },
+          "LastUpdated": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RelativeRange": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "BeforeYears": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "AfterYears": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        }
+      },
+      "ScenarioExectuableType": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Eqn",
+          "Run",
+          "UserDriven"
+        ],
+        "enum": [
+          "Eqn",
+          "Run",
+          "UserDriven"
+        ]
+      },
+      "ScenarioExecutable": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Contents"
+        ],
+        "properties": {
+          "Contents": {
+            "type": "string"
+          }
+        }
+      },
+      "RepositoryStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Name"
+        ],
+        "properties": {
+          "Name": {
+            "type": "string"
+          },
+          "TotalSizeMb": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "MaxSizeMb": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          }
+        }
+      },
+      "ApplicationDiagnosticState": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Users",
+          "Folders"
+        ],
+        "properties": {
+          "Users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PersonUser"
+            }
+          },
+          "Folders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Resource"
+            }
+          }
+        }
+      },
+      "PersonUser": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/User"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "Organization"
+            ],
+            "properties": {
+              "Organization": {
+                "$ref": "#/components/schemas/User"
+              }
+            }
+          }
+        ]
+      },
+      "User": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Id",
+          "Code",
+          "Name"
+        ],
+        "properties": {
+          "Id": {
+            "type": "string"
+          },
+          "Code": {
+            "type": "string"
+          },
+          "Name": {
+            "type": "string"
+          }
+        }
+      },
+      "MeUser": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PersonUser"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "Permissions"
+            ],
+            "properties": {
+              "Permissions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ApplicationPermission"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ApplicationPermission": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "GlobalResource_Modify",
+          "Resource_Product_Modify",
+          "Bespoke_Model_Read",
+          "Release_Modify",
+          "All_Resources_Read",
+          "HangfireDashboard_Use"
+        ],
+        "enum": [
+          "GlobalResource_Modify",
+          "Resource_Product_Modify",
+          "Bespoke_Model_Read",
+          "Release_Modify",
+          "All_Resources_Read",
+          "HangfireDashboard_Use"
+        ]
+      },
+      "Webhook": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NewWebhook"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "Id"
+            ],
+            "properties": {
+              "Id": {
+                "type": "string",
+                "format": "guid"
+              }
+            }
+          }
+        ]
+      },
+      "NewWebhook": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Url",
+          "Name"
+        ],
+        "properties": {
+          "Url": {
+            "type": "string",
+            "minLength": 1
+          },
+          "Name": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "Bearer authentication": {
+        "type": "http",
+        "description": "Enter your JWT here",
+        "name": "Authorization",
+        "in": "header",
+        "scheme": "Bearer",
+        "flows": {
+          "implicit": {
+            "tokenUrl": "/api/v1/swagger/get-token"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "Bearer authentication": []
+    }
+  ]
+}
