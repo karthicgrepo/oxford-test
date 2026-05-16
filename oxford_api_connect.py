@@ -231,6 +231,32 @@ def revoke_access_token(token_id: str) -> None:
     _request("DELETE", f"/v1/access-token/{token_id}")
 
 
+def upload_file(local_path: str, remote_path: str) -> dict:
+    """POST /v1/files/upload/{path} — upload a local file to the GMWO filesystem.
+
+    Must NOT send Content-Type: application/json — requests sets multipart boundary automatically.
+
+    local_path:  path on disk, e.g. "input/test_data.xlsx"
+    remote_path: destination in GMWO, e.g. "me/test_data.xlsx"
+    """
+    ext = local_path.rsplit(".", 1)[-1]
+    upload_headers = {k: v for k, v in SESSION.headers.items() if k.lower() != "content-type"}
+    with open(local_path, "rb") as f:
+        resp = requests.post(
+            f"{BASE_URL}/v1/files/upload/{remote_path}",
+            files={
+                "file": (os.path.basename(local_path), f),
+                "FileExtension": (None, ext),
+            },
+            headers=upload_headers,
+            timeout=TIMEOUT,
+        )
+    if resp.status_code == 401:
+        sys.exit("Authentication failed — check your API token.")
+    resp.raise_for_status()
+    return resp.json()
+
+
 # ---------------------------------------------------------------------------
 # Demo / quick-start
 # ---------------------------------------------------------------------------
@@ -248,35 +274,44 @@ def main():
     me = get_current_user()
     _pp("Current user", me)
 
-    # 2. Browse your root folder
-    root = browse_resources("me")
-    _pp("My resources", root)
+    # 2. Find the latest GEM release to use as input forecast (mirrors solve.ipynb)
+    releases_folder = "oxford-economics/releases/gem"
+    print(f"\nBrowsing {releases_folder} ...")
+    gem_folder = browse_resources(releases_folder)
+    gem_forecasts = [c for c in gem_folder.get("Children", []) if c.get("Type") == "Forecast"]
+    gem_forecasts.sort(key=lambda f: f["Versions"][-1]["CreatedAt"], reverse=True)
+    source_forecast = gem_forecasts[0]
+    input_path = source_forecast["Path"]
+    print(f"Using input forecast: {input_path}")
 
-    #3. Example: trigger a solve
-     #  Edit these paths to match real forecasts in your account.
+    # 3. Upload local xlsx to GMWO before referencing it as CommandsFile
+    local_xlsx  = "input/test_data.xlsx"
+    remote_xlsx = "me/test_data.xlsx"
+    print(f"\nUploading {local_xlsx} → {remote_xlsx} ...")
+    uploaded = upload_file(local_xlsx, remote_xlsx)
+    _pp("Uploaded file", uploaded)
 
+    # 4. Trigger solve — CommandsFile points to the just-uploaded file
+    output_path = "me/test_solve_output"
+    print(f"\nTriggering solve: {input_path} → {output_path} ...")
     op = trigger_solve(
-       input_forecast="me/baseline",
-       output_forecast="me/baseline_solved",
-       solution_range_from="2023Q1",
-       solution_range_to="2027Q4",
-       operation_name="my-solve",
+        input_forecast=input_path,
+        output_forecast=output_path,
+        solution_range_from="2023Q2",
+        solution_range_to="2027Q4",
+        commands_file=uploaded["Path"],
+        operation_name="test-solve",
     )
     _pp("Solve queued", op)
+
+    # 5. Poll /operations/{id}/await until terminal (Succeeded / Failed / Cancelled)
     result = poll_until_done(op["Id"])
     _pp("Solve result", result)
 
-    # 4. Example: fetch variable data from a forecast
-    #    (replace with a real forecast id from step 2)
-    #
-    #    forecast_id = "your-forecast-id-here"
-    #    data = get_variables(
-    #        forecast_id,
-    #        [{"GroupCode": "GBR", "IndicatorCode": "GDP"}],
-    #    )
-    #    _pp("GDP data", data)
-
-    print("\nDone. Uncomment the example blocks above to run solve/export/data flows.")
+    if result["Status"] == "Succeeded":
+        print(f"\nSolve succeeded in {result.get('Duration')}ms")
+    else:
+        print(f"\nSolve FAILED: {result.get('FailureReason')}")
 
 
 if __name__ == "__main__":
